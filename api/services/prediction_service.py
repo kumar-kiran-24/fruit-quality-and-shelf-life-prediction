@@ -21,9 +21,7 @@ class PredictionService:
 
     def __init__(self):
 
-        # ====================================================
         # DEVICE
-        # ====================================================
 
         self.device = torch.device(
             "cuda"
@@ -31,17 +29,8 @@ class PredictionService:
             else "cpu"
         )
 
-        # ====================================================
         # MODEL PATHS
-        # ====================================================
 
-        # Current file:
-        #
-        # api/services/prediction_service.py
-        #
-        # parents[0] = services
-        # parents[1] = api
-        # parents[2] = MAJOR-PROJECT
 
         project_root = (
             Path(__file__)
@@ -65,9 +54,7 @@ class PredictionService:
             "apple_shelf_life_efficientnet_b0_best.pth"
         )
 
-        # ====================================================
         # CLASS NAMES
-        # ====================================================
 
         self.freshness_classes = [
             "fresh",
@@ -80,9 +67,7 @@ class PredictionService:
             "10-14 days"
         ]
 
-        # ====================================================
         # IMAGE PREPROCESSING
-        # ====================================================
 
         self.transform = transforms.Compose([
 
@@ -108,9 +93,7 @@ class PredictionService:
             )
         ])
 
-        # ====================================================
         # LOAD MODELS
-        # ====================================================
 
         print(
             "Initializing Prediction Service..."
@@ -146,9 +129,7 @@ class PredictionService:
             "Prediction Service initialized successfully."
         )
 
-    # ========================================================
     # CREATE EFFICIENTNET-B0
-    # ========================================================
 
     def _create_efficientnet(
         self,
@@ -170,9 +151,7 @@ class PredictionService:
 
         return model
 
-    # ========================================================
     # LOAD TRAINED MODEL
-    # ========================================================
 
     def _load_model(
         self,
@@ -196,9 +175,7 @@ class PredictionService:
             num_classes=num_classes
         )
 
-        # ====================================================
         # LOAD STATE DICT
-        # ====================================================
 
         if isinstance(
             checkpoint,
@@ -228,9 +205,7 @@ class PredictionService:
 
         return model
 
-    # ========================================================
     # IMAGE PREPROCESSING
-    # ========================================================
 
     def _prepare_image(
         self,
@@ -264,9 +239,7 @@ class PredictionService:
 
         return image_tensor
 
-    # ========================================================
     # FRESHNESS PREDICTION
-    # ========================================================
 
     def _predict_freshness(
         self,
@@ -321,9 +294,7 @@ class PredictionService:
                 probability_values
         }
 
-    # ========================================================
     # SHELF-LIFE PREDICTION
-    # ========================================================
 
     def _predict_shelf_life(
         self,
@@ -377,10 +348,6 @@ class PredictionService:
             "probabilities":
                 probability_values
         }
-
-    # ========================================================
-    # COMPLETE APPLE PREDICTION
-    # ========================================================
 
     def predict_apple(
         self,

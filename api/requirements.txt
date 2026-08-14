@@ -5,3 +5,5 @@ pydantic
 pillow
 torch
 torchvision
+sqlalchemy
+psycopg2-binary
