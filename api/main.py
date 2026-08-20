@@ -9,11 +9,21 @@ from api.database.database import (
     Base
 )
 
+from api.database.models import (
+    Batch,
+    Destination,
+    RouteRecommendation
+)
+
 # IMPORTANT:
 # Import the models before create_all().
 # This registers the Batch table with SQLAlchemy.
 from api.database.models import (
     Batch
+)
+
+from api.routes.routing import (
+    router as routing_router
 )
 
 
@@ -40,6 +50,14 @@ from api.routes.batch import (
 
 Base.metadata.create_all(
     bind=engine
+)
+
+Base.metadata.create_all(
+    bind=engine
+)
+
+from api.routes.destination import (
+    router as destination_router
 )
 
 
@@ -131,3 +149,14 @@ def health():
         "status":
             "healthy"
     }
+    
+    
+app.include_router(
+    routing_router,
+    prefix="/api/v1"
+)
+
+app.include_router(
+    destination_router,
+    prefix="/api/v1"
+)
