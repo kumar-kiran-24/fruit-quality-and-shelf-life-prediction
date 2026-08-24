@@ -1,12 +1,9 @@
 import os
-
 from typing import Any
+from pathlib import Path
 
 import requests
-
 from dotenv import load_dotenv
-
-from pathlib import Path
 
 
 # ============================================================
@@ -19,22 +16,32 @@ PROJECT_ROOT = (
     .parents[2]
 )
 
-load_dotenv(
-    PROJECT_ROOT / ".env"
-)
+load_dotenv(PROJECT_ROOT / ".env")
 
 
 # ============================================================
 # CONFIGURATION
 # ============================================================
 
-GOOGLE_MAPS_API_KEY = os.getenv(
-    "GOOGLE_MAPS_API_KEY"
+ROUTING_PROVIDER = os.getenv(
+    "ROUTING_PROVIDER",
+    "openrouteservice"
+).lower()
+
+OPENROUTESERVICE_API_KEY = os.getenv(
+    "OPENROUTESERVICE_API_KEY"
 )
 
-ROUTE_MATRIX_URL = (
-    "https://routes.googleapis.com/"
-    "distanceMatrix/v2:computeRouteMatrix"
+ORS_BASE_URL = (
+    "https://api.heigit.org/openrouteservice"
+)
+
+ORS_MATRIX_URL = (
+    f"{ORS_BASE_URL}/v2/matrix/driving-car"
+)
+
+ORS_GEOCODE_URL = (
+    "https://api.heigit.org/pelias/v1/search"
 )
 
 
@@ -42,15 +49,22 @@ class MapsService:
 
     def __init__(self):
 
-        if not GOOGLE_MAPS_API_KEY:
+        if ROUTING_PROVIDER != "openrouteservice":
 
             raise RuntimeError(
-                "GOOGLE_MAPS_API_KEY is not configured "
+                f"Unsupported routing provider: "
+                f"{ROUTING_PROVIDER}"
+            )
+
+        if not OPENROUTESERVICE_API_KEY:
+
+            raise RuntimeError(
+                "OPENROUTESERVICE_API_KEY is not configured "
                 "in the .env file."
             )
 
         self.api_key = (
-            GOOGLE_MAPS_API_KEY
+            OPENROUTESERVICE_API_KEY
         )
 
 
@@ -65,72 +79,110 @@ class MapsService:
     ) -> list[dict[str, Any]]:
 
         if not destinations:
-
             return []
 
 
         # ----------------------------------------------------
-        # Origin
+        # Resolve origin address → coordinates
         # ----------------------------------------------------
 
-        origins = [
+        origin_coordinates = (
+            self._resolve_origin(
+                origin_address
+            )
+        )
 
-            {
-                "waypoint": {
-                    "address": origin_address
-                }
-            }
 
+        # ----------------------------------------------------
+        # Build coordinates
+        #
+        # ORS expects:
+        # [longitude, latitude]
+        #
+        # First coordinate = origin
+        # Remaining coordinates = destinations
+        # ----------------------------------------------------
+
+        locations = [
+            origin_coordinates
         ]
-
-
-        # ----------------------------------------------------
-        # Destinations
-        # ----------------------------------------------------
-
-        destination_waypoints = []
 
         for destination in destinations:
 
-            destination_waypoints.append({
+            if (
+                destination.latitude is None
+                or destination.longitude is None
+            ):
 
-                "waypoint": {
+                continue
 
-                    "location": {
+            locations.append([
+                float(destination.longitude),
+                float(destination.latitude)
+            ])
 
-                        "latLng": {
 
-                            "latitude":
-                                destination.latitude,
+        if len(locations) <= 1:
 
-                            "longitude":
-                                destination.longitude
-                        }
-                    }
-                }
-            })
+            raise RuntimeError(
+                "No destination coordinates are available "
+                "for routing."
+            )
 
 
         # ----------------------------------------------------
-        # Request
+        # Destination index mapping
+        # ----------------------------------------------------
+
+        destination_mapping = []
+
+        for index, destination in enumerate(
+            destinations
+        ):
+
+            if (
+                destination.latitude is None
+                or destination.longitude is None
+            ):
+                continue
+
+            # ORS matrix index:
+            #
+            # 0 = origin
+            # 1 = first destination
+            # 2 = second destination
+            # ...
+
+            destination_mapping.append(
+                (
+                    index,
+                    len(destination_mapping) + 1
+                )
+            )
+
+
+        # ----------------------------------------------------
+        # OpenRouteService Matrix request
         # ----------------------------------------------------
 
         payload = {
 
-            "origins":
-                origins,
+            "locations": locations,
 
-            "destinations":
-                destination_waypoints,
+            "sources": [
+                0
+            ],
 
-            "travelMode":
-                "DRIVE",
+            "destinations": [
+                matrix_index
+                for _, matrix_index
+                in destination_mapping
+            ],
 
-            "routingPreference":
-                "TRAFFIC_AWARE",
-
-            "units":
-                "METRIC"
+            "metrics": [
+                "distance",
+                "duration"
+            ]
         }
 
 
@@ -139,31 +191,33 @@ class MapsService:
             "Content-Type":
                 "application/json",
 
-            "X-Goog-Api-Key":
-                self.api_key,
+            "Accept":
+                "application/json",
 
-            "X-Goog-FieldMask":
-                (
-                    "originIndex,"
-                    "destinationIndex,"
-                    "duration,"
-                    "distanceMeters,"
-                    "status,"
-                    "condition"
-                )
+            "Authorization":
+                self.api_key
         }
 
 
-        response = requests.post(
+        try:
 
-            ROUTE_MATRIX_URL,
+            response = requests.post(
 
-            json=payload,
+                ORS_MATRIX_URL,
 
-            headers=headers,
+                json=payload,
 
-            timeout=30
-        )
+                headers=headers,
+
+                timeout=30
+            )
+
+        except requests.RequestException as exc:
+
+            raise RuntimeError(
+                "OpenRouteService network error: "
+                f"{str(exc)}"
+            ) from exc
 
 
         # ----------------------------------------------------
@@ -173,67 +227,105 @@ class MapsService:
         if response.status_code >= 400:
 
             raise RuntimeError(
-                "Google Routes API error: "
+                "OpenRouteService API error: "
                 f"{response.status_code} "
                 f"{response.text}"
             )
 
 
-        result = response.json()
+        try:
+
+            result = response.json()
+
+        except ValueError as exc:
+
+            raise RuntimeError(
+                "OpenRouteService returned "
+                "an invalid JSON response."
+            ) from exc
+
+
+        # ----------------------------------------------------
+        # Extract matrix values
+        # ----------------------------------------------------
+
+        distances = (
+            result.get("distances")
+        )
+
+        durations = (
+            result.get("durations")
+        )
+
+
+        if distances is None:
+
+            raise RuntimeError(
+                "OpenRouteService response does not "
+                "contain distance data."
+            )
+
+
+        if durations is None:
+
+            raise RuntimeError(
+                "OpenRouteService response does not "
+                "contain duration data."
+            )
+
+
+        if not distances:
+
+            return []
+
+
+        distance_row = distances[0]
+        duration_row = durations[0]
 
 
         # ----------------------------------------------------
         # Normalize response
+        #
+        # Keep the same response structure that the
+        # existing routing service expects.
         # ----------------------------------------------------
 
         normalized = []
 
 
-        for item in result:
+        for position, (
+            destination_index,
+            matrix_index
+        ) in enumerate(
+            destination_mapping
+        ):
 
-            destination_index = (
-                item.get(
-                    "destinationIndex"
-                )
-            )
-
-            if destination_index is None:
-
+            if position >= len(
+                distance_row
+            ):
                 continue
 
 
             distance_meters = (
-                item.get(
-                    "distanceMeters"
-                )
-            )
-
-
-            duration_value = (
-                item.get(
-                    "duration"
-                )
+                distance_row[position]
             )
 
 
             duration_seconds = (
-                self._parse_duration(
-                    duration_value
-                )
+                duration_row[position]
+                if position < len(duration_row)
+                else None
             )
 
 
-            status = item.get(
-                "status"
-            )
-
-
-            condition = item.get(
-                "condition"
-            )
-
-
+            # ORS can return null when a route
+            # cannot be calculated.
             if distance_meters is None:
+
+                continue
+
+
+            if duration_seconds is None:
 
                 continue
 
@@ -244,16 +336,18 @@ class MapsService:
                     destination_index,
 
                 "distance_km":
-                    distance_meters / 1000.0,
+                    float(distance_meters)
+                    / 1000.0,
 
                 "duration_minutes":
-                    duration_seconds / 60.0,
+                    float(duration_seconds)
+                    / 60.0,
 
                 "status":
-                    status,
+                    "OK",
 
                 "condition":
-                    condition
+                    "ROUTE_FOUND"
             })
 
 
@@ -261,31 +355,136 @@ class MapsService:
 
 
     # ========================================================
-    # PARSE GOOGLE DURATION
+    # RESOLVE ORIGIN
     # ========================================================
 
-    @staticmethod
-    def _parse_duration(
-        duration_value
-    ) -> float:
+    def _resolve_origin(
+        self,
+        origin_address: str
+    ) -> list[float]:
 
-        if not duration_value:
+        if not origin_address:
+            raise ValueError(
+                "Origin address is required for route calculation."
+            )
 
-            return 0.0
+        origin_address = origin_address.strip()
 
+        # ----------------------------------------------------
+        # Support "latitude,longitude"
+        # Example:
+        # 14.4673,75.9149
+        # ----------------------------------------------------
 
-        if isinstance(
-            duration_value,
-            str
-        ):
+        parts = origin_address.split(",")
 
-            if duration_value.endswith(
-                "s"
-            ):
+        if len(parts) == 2:
 
-                return float(
-                    duration_value[:-1]
-                )
+            try:
+                latitude = float(parts[0].strip())
+                longitude = float(parts[1].strip())
 
+                if (
+                    -90 <= latitude <= 90
+                    and
+                    -180 <= longitude <= 180
+                ):
+                    return [
+                        longitude,
+                        latitude
+                    ]
 
-        return 0.0
+            except ValueError:
+                pass
+
+        # ----------------------------------------------------
+        # Normalize known city name
+        # ----------------------------------------------------
+
+        normalized_address = origin_address.lower()
+
+        if normalized_address in {
+            "shivamoga",
+            "shivamogga",
+            "shimoga"
+        }:
+            origin_address = (
+                "Shivamogga, Karnataka, India"
+            )
+
+        # ----------------------------------------------------
+        # Nominatim geocoding
+        # ----------------------------------------------------
+
+        url = (
+            "https://nominatim.openstreetmap.org/search"
+        )
+
+        params = {
+            "q": origin_address,
+            "format": "jsonv2",
+            "limit": 1,
+            "countrycodes": "in"
+        }
+
+        headers = {
+            "User-Agent":
+                "FruitSupplyChainPrototype/1.0"
+        }
+
+        try:
+
+            response = requests.get(
+                url,
+                params=params,
+                headers=headers,
+                timeout=30
+            )
+
+        except requests.RequestException as exc:
+
+            raise RuntimeError(
+                "Nominatim geocoding network error: "
+                f"{str(exc)}"
+            ) from exc
+
+        if response.status_code >= 400:
+
+            raise RuntimeError(
+                "Nominatim geocoding error: "
+                f"{response.status_code} "
+                f"{response.text}"
+            )
+
+        try:
+
+            results = response.json()
+
+        except ValueError as exc:
+
+            raise RuntimeError(
+                "Nominatim returned invalid JSON."
+            ) from exc
+
+        if not results:
+
+            raise ValueError(
+                "Could not geocode origin address: "
+                f"{origin_address}"
+            )
+
+        latitude = float(
+            results[0]["lat"]
+        )
+
+        longitude = float(
+            results[0]["lon"]
+        )
+
+        # ORS requires:
+        # [longitude, latitude]
+
+        return [
+            longitude,
+            latitude
+        ]

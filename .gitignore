@@ -1,3 +1,21 @@
 .env
 
+__pycache__/
+*.pyc
+
 dataset/
+model/dataset
+model/extenal-test-data
+model/fruit_detection_source
+model/yolo11_dataset
+model/yolo11
+model/extenal-test-data
+*.png
+*.jpg
+
+model/apple_yolo_dataset
+apple_models/apple_detection_100epochs
+model/batch_input
+model/apple_models
+model/batch_results
+*.db

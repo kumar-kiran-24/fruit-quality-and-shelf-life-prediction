@@ -7,3 +7,7 @@ torch
 torchvision
 sqlalchemy
 psycopg2-binary
+ultralytics
+python-jose[cryptography]
+passlib[bcrypt]
+pydantic[email]

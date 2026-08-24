@@ -54,6 +54,22 @@ class BatchService:
                 "apple"
             ),
 
+            # User ownership
+            user_id=certificate.get(
+                "user_id"
+            ),
+
+            # Image & detection counts
+            number_of_images=certificate.get(
+                "number_of_images",
+                0
+            ),
+
+            total_apples_detected=certificate.get(
+                "total_apples_detected",
+                0
+            ),
+
             origin=certificate[
                 "origin"
             ],
@@ -115,7 +131,10 @@ class BatchService:
             # Logistics
             # ------------------------------------------------
 
-            batch_status="AVAILABLE"
+            batch_status=certificate.get(
+                "batch_status",
+                "CREATED"
+            )
         )
 
         # ----------------------------------------------------
