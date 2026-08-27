@@ -1,0 +1,18 @@
+export const API_CONFIG = {
+  BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1',
+  ENDPOINTS: {
+    LOGIN: '/auth/login',
+    REGISTER: '/auth/register',
+    ME: '/users/me',
+    SUMMARY: '/dashboard/summary',
+    BATCHES: '/dashboard/batches',
+    BATCH_DETAIL: (id: string) => `/dashboard/batches/${id}`,
+    UPLOAD: '/batch-upload',
+    PREDICT_SHELF_LIFE: (id: string) => `/shelf-life/predict/${id}`,
+    RECOMMENDATIONS: (id: string) => `/recommendations/buyer/${id}`,
+    ASSIGN: (id: string) => `/recommendations/assign/${id}`,
+    STATUS_UPDATE: (id: string) => `/batch-status/${id}`,
+    STATUS_HISTORY: (id: string) => `/batch-status/${id}/history`,
+    DESTINATIONS: '/destinations',
+  },
+} as const
