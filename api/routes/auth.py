@@ -66,7 +66,9 @@ def register_user(
             address=data.address,
             city=data.city,
             state=data.state,
+            country=data.country,
             pincode=data.pincode,
+            phone_number=data.phone_number,
             latitude=data.latitude,
             longitude=data.longitude
         )
@@ -74,12 +76,16 @@ def register_user(
         return user
 
     except ValueError as exc:
-
+        detail_str = str(exc)
+        # Location lookup failures are client errors
+        if "Location lookup failed" in detail_str:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=detail_str
+            )
         raise HTTPException(
-            status_code=(
-                status.HTTP_409_CONFLICT
-            ),
-            detail=str(exc)
+            status_code=(status.HTTP_409_CONFLICT),
+            detail=detail_str
         )
 
     except Exception as exc:

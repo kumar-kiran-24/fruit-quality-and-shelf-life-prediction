@@ -45,9 +45,19 @@ class UserRegister(BaseModel):
         description="State"
     )
 
+    country: Optional[str] = Field(
+        default=None,
+        description="Country"
+    )
+
     pincode: Optional[str] = Field(
         default=None,
         description="Pincode / ZIP code"
+    )
+
+    phone_number: Optional[str] = Field(
+        default=None,
+        description="Phone number"
     )
 
     latitude: Optional[float] = Field(
@@ -118,7 +128,11 @@ class UserProfileUpdate(BaseModel):
 
     state: Optional[str] = None
 
+    country: Optional[str] = None
+
     pincode: Optional[str] = None
+
+    phone_number: Optional[str] = None
 
     latitude: Optional[float] = None
 
@@ -146,7 +160,11 @@ class UserResponse(BaseModel):
 
     state: Optional[str] = None
 
+    country: Optional[str] = None
+
     pincode: Optional[str] = None
+
+    phone_number: Optional[str] = None
 
     latitude: Optional[float] = None
 
@@ -159,3 +177,23 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     updated_at: datetime
+
+
+# ============================================================
+# PASSWORD CHANGE
+# ============================================================
+
+
+class PasswordChange(BaseModel):
+
+    old_password: str = Field(
+        ...,
+        description="Current password"
+    )
+
+    new_password: str = Field(
+        ...,
+        min_length=6,
+        max_length=128,
+        description="New password"
+    )

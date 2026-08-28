@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -21,6 +22,13 @@ class BatchCreate(BaseModel):
 # ============================================================
 # BATCH RESPONSE SCHEMA
 # ============================================================
+
+class BatchImageResponse(BaseModel):
+    id: int
+    filename: str
+    url: str
+    model_config = ConfigDict(from_attributes=True)
+
 
 class BatchResponse(BaseModel):
 
@@ -87,3 +95,7 @@ class BatchResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True
     )
+
+
+class BatchDetailsResponse(BatchResponse):
+    images: List[BatchImageResponse] = []

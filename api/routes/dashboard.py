@@ -11,7 +11,8 @@ from api.database.models import (
     User,
     Batch,
     RouteRecommendation,
-    Dispatch
+    Dispatch,
+    BatchImage
 )
 from api.auth.dependencies import (
     get_current_user
@@ -283,6 +284,25 @@ def get_my_batch_detail(
         .first()
     )
 
+    # ------------------------------------------------
+    # Get images
+    # ------------------------------------------------
+    images = (
+        db.query(BatchImage)
+        .filter(BatchImage.batch_id == batch_id)
+        .order_by(BatchImage.created_at.asc())
+        .all()
+    )
+
+    image_list = [
+        {
+            "id": img.id,
+            "filename": img.filename,
+            "url": f"/uploads/batches/{batch_id}/original/{img.filename}"
+        }
+        for img in images
+    ]
+
     return {
 
         "batch": {
@@ -331,7 +351,8 @@ def get_my_batch_detail(
                 .isoformat(),
             "updated_at":
                 batch.updated_at
-                .isoformat()
+                .isoformat(),
+            "images": image_list
         },
 
         "recommendations": [

@@ -23,23 +23,41 @@ VALID_TRANSITIONS = {
 
     "DETECTED": [
         "SHELF_LIFE_PREDICTED",
-        "RECOMMENDED"
+        "RECOMMENDED",
+        "ANALYZED"
     ],
 
     "SHELF_LIFE_PREDICTED": [
-        "RECOMMENDED"
+        "RECOMMENDED",
+        "ANALYZED"
+    ],
+
+    "ANALYZED": [
+        "RECOMMENDED",
+        "READY_FOR_TRANSFER"
     ],
 
     "RECOMMENDED": [
-        "ASSIGNED_TO_BUYER"
+        "ASSIGNED_TO_BUYER",
+        "READY_FOR_TRANSFER"
     ],
 
     "ASSIGNED_TO_BUYER": [
-        "READY_FOR_DISPATCH"
+        "READY_FOR_DISPATCH",
+        "READY_FOR_TRANSFER"
     ],
 
     "READY_FOR_DISPATCH": [
         "DISPATCHED"
+    ],
+
+    "READY_FOR_TRANSFER": [
+        "TRANSFERRED"
+    ],
+
+    "TRANSFERRED": [
+        "IN_TRANSIT",
+        "DELIVERED"
     ],
 
     "DISPATCHED": [
@@ -67,18 +85,21 @@ VALID_TRANSITIONS = {
     "AVAILABLE": [
         "RECOMMENDED",
         "ASSIGNED_TO_BUYER",
-        "DISPATCHED"
+        "DISPATCHED",
+        "READY_FOR_TRANSFER"
     ],
 
     "FEFO_SELECTED": [
         "RECOMMENDED",
         "ASSIGNED_TO_BUYER",
-        "DISPATCHED"
+        "DISPATCHED",
+        "READY_FOR_TRANSFER"
     ],
 
     "ROUTE_RECOMMENDED": [
         "ASSIGNED_TO_BUYER",
-        "DISPATCHED"
+        "DISPATCHED",
+        "READY_FOR_TRANSFER"
     ],
 
     "REROUTED": [

@@ -6,6 +6,7 @@ import PageIntro from '../../components/common/PageIntro'
 import Status from '../../components/common/Status'
 import { apiRequest } from '../../lib/apiClient'
 import { API_CONFIG } from '../../config/api.config'
+import { safeFixed } from '../../lib/utils'
 
 export default function ShelfLifePage() {
   const [batches, setBatches] = useState<any[]>([])
@@ -17,7 +18,8 @@ export default function ShelfLifePage() {
       try {
         setLoading(true)
         const data = await apiRequest(API_CONFIG.ENDPOINTS.BATCHES)
-        setBatches(data.batches || [])
+        const list = Array.isArray(data) ? data : (data.batches || data.items || [])
+        setBatches(list)
       } catch (err: any) {
         setError(err.message || 'Failed to load shelf life data.')
       } finally {
@@ -36,11 +38,11 @@ export default function ShelfLifePage() {
     if (predictedBatches.length === 0) return '0'
     const totalDays = predictedBatches.reduce((sum, b) => {
       // Extract first number or middle number from label like "5-10 days" or "10-14 days"
-      const match = b.shelf_life_prediction.match(/(\d+)/)
+      const match = String(b.shelf_life_prediction).match(/(\d+)/)
       const days = match ? parseInt(match[1]) : 7
       return sum + days
     }, 0)
-    return (totalDays / predictedBatches.length).toFixed(1)
+    return safeFixed(totalDays / predictedBatches.length, 1, '0')
   }, [activeBatches])
 
   const averageQuality = useMemo(() => {

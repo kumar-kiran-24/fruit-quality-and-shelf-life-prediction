@@ -81,8 +81,18 @@ class User(Base):
         nullable=True
     )
 
+    country = Column(
+        String(100),
+        nullable=True
+    )
+
     pincode = Column(
         String(20),
+        nullable=True
+    )
+
+    phone_number = Column(
+        String(50),
         nullable=True
     )
 
@@ -318,6 +328,14 @@ class Batch(Base):
         back_populates="batch",
         foreign_keys="BatchStatusHistory.batch_id",
         primaryjoin="Batch.batch_id == BatchStatusHistory.batch_id",
+        lazy="dynamic"
+    )
+
+    transfers = relationship(
+        "BatchTransfer",
+        back_populates="batch",
+        foreign_keys="BatchTransfer.batch_id",
+        primaryjoin="Batch.batch_id == BatchTransfer.batch_id",
         lazy="dynamic"
     )
 
@@ -777,4 +795,154 @@ class Dispatch(Base):
         nullable=False,
         default=datetime.utcnow,
         onupdate=datetime.utcnow
+    )
+
+
+# ============================================================
+# BATCH IMAGE MODEL
+# ============================================================
+
+class BatchImage(Base):
+
+    __tablename__ = "batch_images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    batch_id = Column(String(100), nullable=False, index=True)
+    filename = Column(String(255), nullable=False)
+    original_path = Column(String(500), nullable=False)
+    annotated_path = Column(String(500), nullable=True)
+    apple_count = Column(Integer, default=0)
+    average_confidence = Column(Float, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+# ============================================================
+# BATCH TRANSFER MODEL
+# ============================================================
+
+class BatchTransfer(Base):
+
+    __tablename__ = "batch_transfers"
+
+    # ========================================================
+    # PRIMARY KEY
+    # ========================================================
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    # ========================================================
+    # TRANSFER IDENTIFICATION
+    # ========================================================
+
+    transfer_id = Column(
+        String(100),
+        unique=True,
+        nullable=False,
+        index=True
+    )
+
+    # ========================================================
+    # BATCH REFERENCE
+    # ========================================================
+
+    batch_id = Column(
+        String(100),
+        nullable=False,
+        index=True
+    )
+
+    # ========================================================
+    # DESTINATION
+    # ========================================================
+
+    destination_id = Column(
+        String(100),
+        nullable=False,
+        index=True
+    )
+
+    destination_name = Column(
+        String(255),
+        nullable=False
+    )
+
+    destination_address = Column(
+        String(500),
+        nullable=True
+    )
+
+    # ========================================================
+    # TRANSFER STATUS
+    # ========================================================
+
+    transfer_status = Column(
+        String(50),
+        nullable=False,
+        default="TRANSFERRED"
+    )
+
+    # ========================================================
+    # NOTES
+    # ========================================================
+
+    notes = Column(
+        Text,
+        nullable=True
+    )
+
+    # ========================================================
+    # PLANNED DISPATCH
+    # ========================================================
+
+    planned_dispatch_date = Column(
+        DateTime,
+        nullable=True
+    )
+
+    # ========================================================
+    # TIMESTAMPS
+    # ========================================================
+
+    transferred_at = Column(
+        DateTime,
+        nullable=True
+    )
+
+    in_transit_at = Column(
+        DateTime,
+        nullable=True
+    )
+
+    delivered_at = Column(
+        DateTime,
+        nullable=True
+    )
+
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow
+    )
+
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
+    # ========================================================
+    # RELATIONSHIPS
+    # ========================================================
+
+    batch = relationship(
+        "Batch",
+        back_populates="transfers",
+        foreign_keys=[batch_id],
+        primaryjoin="BatchTransfer.batch_id == Batch.batch_id",
+        lazy="joined"
     )

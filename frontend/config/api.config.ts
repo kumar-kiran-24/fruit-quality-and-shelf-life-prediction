@@ -14,5 +14,7 @@ export const API_CONFIG = {
     STATUS_UPDATE: (id: string) => `/batch-status/${id}`,
     STATUS_HISTORY: (id: string) => `/batch-status/${id}/history`,
     DESTINATIONS: '/destinations',
+    AI_REPORT: (id: string) => `/batches/${id}/ai-report`,
+    FEFO_QUEUE: '/batches/fefo/queue',
   },
 } as const

@@ -4,21 +4,21 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  Apple, Bell, ChevronDown, CircleHelp, Clock3, Ellipsis,
-  LayoutDashboard, Leaf, Menu, Package, Plus, Settings2, Sparkles, Sprout, Users, X
+  Bell, ChevronDown, CircleHelp, Leaf, LogOut, Menu, X
 } from 'lucide-react'
 import { apiRequest } from '../../lib/apiClient'
 import { API_CONFIG } from '../../config/api.config'
+import { authService } from '../../services/authService'
 
 const nav = [
-  ['Overview', LayoutDashboard, '/dashboard'],
-  ['Batches', Package, '/batches'],
-  ['Create Batch', Plus, '/batches/create'],
-  ['Detection', Sparkles, '/detection'],
-  ['Shelf Life', Clock3, '/shelf-life'],
-  ['Recommendations', Sprout, '/recommendations'],
-  ['Buyers', Users, '/buyers'],
-  ['Profile', Settings2, '/profile'],
+  ['Overview', '/dashboard'],
+  ['Batches', '/batches'],
+  ['Create Batch', '/batches/create'],
+  ['Detection', '/detection'],
+  ['Shelf Life', '/shelf-life'],
+  ['Recommendations', '/recommendations'],
+  ['Buyers', '/buyers'],
+  ['Profile', '/profile'],
 ]
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -27,18 +27,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false)
   const [user, setUser] = useState<{ name: string; role: string; email: string } | null>(null)
 
-  useEffect(() => {
-    if (pathname === '/login') return
+  const isPublicRoute = pathname === '/login' || pathname === '/register'
 
-    const token = localStorage.getItem('orchard_token')
+  useEffect(() => {
+    if (isPublicRoute) return
+
+    const token = authService.getStoredToken()
     if (!token) {
       router.push('/login')
       return
     }
 
-    const storedUser = localStorage.getItem('orchard_user')
+    const storedUser = authService.getStoredUser()
     if (storedUser) {
-      setUser(JSON.parse(storedUser))
+      setUser(storedUser as any)
     }
 
     // Sync profile from backend
@@ -55,24 +57,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         localStorage.setItem('orchard_user', JSON.stringify(updatedUser))
       } catch (err) {
         // Clear tokens on auth failure (like expired JWT)
-        localStorage.removeItem('orchard_token')
-        localStorage.removeItem('orchard_user')
+        authService.logoutUser()
         router.push('/login')
       }
     }
 
     syncProfile()
-  }, [pathname, router])
+  }, [pathname, router, isPublicRoute])
 
-  // Skip rendering navigation layout for the login screen
-  if (pathname === '/login') {
+  // Skip rendering navigation layout for public screens (login & register)
+  if (isPublicRoute) {
     return <>{children}</>
   }
 
   // Map route pathname to active navigation label
   const getActiveLabel = (path: string): string => {
     if (path === '/dashboard') return 'Overview'
-    if (path === '/batches/create') return 'Create Batch'
+    if (path === '/batches/create' || path === '/create-batch') return 'Create Batch'
     if (path.startsWith('/batches')) return 'Batches'
     if (path === '/detection') return 'Detection'
     if (path === '/shelf-life') return 'Shelf Life'
@@ -86,10 +87,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Generate dynamic breadcrumb hierarchy
   const renderBreadcrumbs = () => {
-    if (pathname === '/dashboard') {
-      return <b>Overview</b>
-    }
-    if (pathname === '/batches/create') {
+    if (pathname === '/dashboard') return <b>Overview</b>
+    if (pathname === '/batches/create' || pathname === '/create-batch') {
       return (
         <>
           <span>Batches</span>
@@ -109,30 +108,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </>
       )
     }
-    if (pathname === '/batches') {
-      return <b>Batches</b>
-    }
-    if (pathname === '/detection') {
-      return <b>Detection</b>
-    }
-    if (pathname === '/shelf-life') {
-      return <b>Shelf Life</b>
-    }
-    if (pathname === '/recommendations') {
-      return <b>Recommendations</b>
-    }
-    if (pathname === '/buyers') {
-      return <b>Buyers</b>
-    }
-    if (pathname === '/profile') {
-      return <b>Profile</b>
-    }
+    if (pathname === '/batches') return <b>Batches</b>
+    if (pathname === '/detection') return <b>Detection</b>
+    if (pathname === '/shelf-life') return <b>Shelf Life</b>
+    if (pathname === '/recommendations') return <b>Recommendations</b>
+    if (pathname === '/buyers') return <b>Buyers</b>
+    if (pathname === '/profile') return <b>Profile</b>
     return <b>Overview</b>
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('orchard_token')
-    localStorage.removeItem('orchard_user')
+    authService.logoutUser()
     router.push('/login')
   }
 
@@ -143,13 +129,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell">
       <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`}>
-        <div className="brand">
-          <div className="brand-mark">
-            <Apple size={19} fill="currentColor" />
-          </div>
-          <span>
-            orchard<span>OS</span>
-          </span>
+        <div className="brand" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px 24px' }}>
+          <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none', background: '#ffffff', padding: '6px 14px', borderRadius: '12px', boxShadow: '0 4px 14px rgba(0, 0, 0, 0.2)' }}>
+            <img
+              src="/major-project.png"
+              alt="Application Logo"
+              style={{ height: '36px', maxWidth: '170px', objectFit: 'contain', display: 'block' }}
+            />
+          </Link>
           <button className="mobile-close" onClick={() => setMobileNav(false)} aria-label="Close navigation">
             <X size={18} />
           </button>
@@ -164,15 +151,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
         <nav>
           <p className="nav-label">Workspace</p>
-          {nav.map(([label, Icon, path]) => (
+          {nav.map(([label, path]) => (
             <Link
-              key={label as string}
-              href={path as string}
+              key={label}
+              href={path}
               onClick={() => setMobileNav(false)}
               className={activeLabel === label ? 'nav-item active' : 'nav-item'}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 14px',
+                fontSize: '0.85rem',
+                fontWeight: activeLabel === label ? 700 : 500,
+                letterSpacing: '0.01em',
+                borderRadius: '8px',
+                transition: 'all 0.15s ease-in-out',
+                color: activeLabel === label ? '#fffdf8' : '#a9bec0',
+                background: activeLabel === label ? '#294e5d' : 'transparent',
+                boxShadow: activeLabel === label ? 'inset 3px 0 var(--gold)' : 'none',
+              }}
             >
-              <Icon size={17} />
-              <span>{label as string}</span>
+              <span>{label}</span>
               {label === 'Recommendations' && <i>3</i>}
             </Link>
           ))}
@@ -193,15 +193,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <CircleHelp size={16} />
             Help center
           </button>
-          <div className="user-chip" onClick={handleLogout} style={{ cursor: 'pointer' }} title="Click to log out">
-            <div className="user-avatar">{userInitials}</div>
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <b style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'block' }}>
-                {user?.name || 'Jamie Davis'}
-              </b>
-              <small>{user?.role === 'USER' ? 'Farm manager' : user?.role || 'Farm manager'}</small>
+          <div className="user-chip" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, overflow: 'hidden' }}>
+              <div className="user-avatar">{userInitials}</div>
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <b style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'block' }}>
+                  {user?.name || 'Jamie Davis'}
+                </b>
+                <small>{user?.role === 'USER' ? 'Farm manager' : user?.role || 'Farm manager'}</small>
+              </div>
             </div>
-            <Ellipsis size={17} />
+            <button
+              onClick={handleLogout}
+              style={{ background: 'none', border: 'none', color: 'var(--navy-muted)', padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              title="Log Out"
+              aria-label="Log Out"
+            >
+              <LogOut size={17} />
+            </button>
           </div>
         </div>
       </aside>
@@ -221,7 +230,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Bell size={18} />
               <i />
             </button>
-            <div className="top-avatar">{userInitials}</div>
+            <div
+              className="top-avatar"
+              onClick={handleLogout}
+              style={{ cursor: 'pointer' }}
+              title="Click to Log Out"
+            >
+              {userInitials}
+            </div>
           </div>
         </header>
         <div className="page-wrap">{children}</div>
@@ -229,3 +245,4 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
+

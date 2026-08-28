@@ -88,7 +88,22 @@ class FEFOService:
 
         # ----------------------------------------------------
         # Get available batches
+        #
+        # Exclude batches that have been
+        # transferred, dispatched, in transit,
+        # delivered, or completed.
+        #
+        # FEFO only considers batches in
+        # active/available statuses.
         # ----------------------------------------------------
+
+        excluded_statuses = {
+            "TRANSFERRED",
+            "DISPATCHED",
+            "IN_TRANSIT",
+            "DELIVERED",
+            "COMPLETED"
+        }
 
         batches = (
 
@@ -101,6 +116,19 @@ class FEFOService:
 
             .all()
         )
+
+        # Also include batches in other active
+        # statuses that haven't been excluded
+        if not batches:
+            batches = (
+                db.query(Batch)
+                .filter(
+                    Batch.batch_status.notin_(
+                        excluded_statuses
+                    )
+                )
+                .all()
+            )
 
 
         # ----------------------------------------------------

@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 from api.database.database import get_db
 from api.database.models import (
     User,
-    BatchStatusHistory
+    BatchStatusHistory,
+    BatchImage
 )
 from api.auth.dependencies import (
     get_current_user
@@ -29,6 +30,10 @@ from api.services.yolo_services import (
 )
 from api.services.status_service import (
     StatusService
+)
+
+from api.services.prediction_service import (
+    PredictionService
 )
 
 
@@ -49,6 +54,8 @@ router = APIRouter(
 batch_service = BatchService()
 
 status_service = StatusService()
+
+prediction_service = PredictionService()
 
 # Lazy-load YOLO to avoid startup delay
 _yolo_service = None
@@ -171,11 +178,20 @@ async def upload_batch(
 
     yolo = get_yolo_service()
 
+    # Prepare persistent storage for images
+    project_root = Path(__file__).resolve().parents[2]
+    uploads_base = project_root / "uploads" / "batches" / batch_id
+    original_dir = uploads_base / "original"
+    annotated_dir = uploads_base / "annotated"
+    original_dir.mkdir(parents=True, exist_ok=True)
+    annotated_dir.mkdir(parents=True, exist_ok=True)
+
     total_apples = 0
-
     image_results = []
-
-    temporary_paths = []
+    freshness_preds = []
+    freshness_confs = []
+    shelf_life_preds = []
+    shelf_life_confs = []
 
     try:
 
@@ -187,35 +203,38 @@ async def upload_batch(
                 continue
 
             suffix = (
-                Path(
-                    file.filename or "apple.jpg"
-                ).suffix
-                or ".jpg"
+                Path(file.filename or "apple.jpg").suffix or ".jpg"
             )
-
-            with tempfile.NamedTemporaryFile(
-                suffix=suffix,
-                delete=False
-            ) as tmp:
-
-                tmp.write(contents)
-
-                tmp_path = tmp.name
-
-            temporary_paths.append(tmp_path)
+            # Save original image permanently
+            safe_name = f"{Path(file.filename or 'apple.jpg').stem}_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}{suffix}"
+            save_path = original_dir / safe_name
+            with open(save_path, 'wb') as f:
+                f.write(contents)
 
             # ------------------------------------
             # Run YOLO detection
             # ------------------------------------
 
-            apples = (
-                yolo.detect_apples(
-                    image_path=tmp_path,
-                    confidence_threshold=0.25
-                )
+            apples = yolo.detect_apples(
+                image_path=str(save_path),
+                confidence_threshold=0.25
             )
 
             apple_count = len(apples)
+
+            # Per-image detection logging
+            confidences = [a["confidence"] for a in apples]
+            print(f"[YOLO Batch Detection] Image: {file.filename}, Apple count: {apple_count}, Confidences: {[round(c,4) for c in confidences]}")
+
+            # Run freshness and shelf-life prediction per image
+            try:
+                pred = prediction_service.predict_apple(str(save_path))
+                freshness_preds.append(pred["freshness"]["prediction"])
+                freshness_confs.append(pred["freshness"]["confidence"])
+                shelf_life_preds.append(pred["shelf_life"]["prediction"])
+                shelf_life_confs.append(pred["shelf_life"]["confidence"])
+            except Exception as e:
+                print(f"[Prediction Error] Image {file.filename}: {e}")
 
             total_apples += apple_count
 
@@ -233,7 +252,7 @@ async def upload_batch(
             image_results.append({
 
                 "image_name":
-                    file.filename,
+                    safe_name,
 
                 "apple_count":
                     apple_count,
@@ -241,17 +260,34 @@ async def upload_batch(
                 "average_confidence":
                     round(
                         avg_confidence, 4
-                    )
+                    ),
+                "original_path": str(save_path)
             })
 
-    finally:
+    except Exception:
+        pass
 
-        for path in temporary_paths:
+    # Batch detection summary logging
+    print(f"[YOLO Batch Detection] Batch ID: {batch_id}, Total images: {len(files)}, Total apples detected: {total_apples}")
 
-            p = Path(path)
+    # Aggregate predictions across images
+    if freshness_preds:
+        from collections import Counter
+        freshness_counter = Counter(freshness_preds)
+        freshness_prediction = freshness_counter.most_common(1)[0][0]
+        freshness_confidence = sum(freshness_confs) / len(freshness_confs)
+    else:
+        freshness_prediction = "N/A"
+        freshness_confidence = 0.0
 
-            if p.exists():
-                p.unlink()
+    if shelf_life_preds:
+        from collections import Counter
+        shelf_life_counter = Counter(shelf_life_preds)
+        shelf_life_prediction = shelf_life_counter.most_common(1)[0][0]
+        shelf_life_confidence = sum(shelf_life_confs) / len(shelf_life_confs)
+    else:
+        shelf_life_prediction = "N/A"
+        shelf_life_confidence = 0.0
 
     # ----------------------------------------------------
     # Create batch record
@@ -263,10 +299,10 @@ async def upload_batch(
         "fruit": "apple",
         "origin": origin,
         "current_address": current_address,
-        "freshness_prediction": "N/A",
-        "freshness_confidence": 0.0,
-        "shelf_life_prediction": "N/A",
-        "shelf_life_confidence": 0.0,
+        "freshness_prediction": freshness_prediction,
+        "freshness_confidence": freshness_confidence,
+        "shelf_life_prediction": shelf_life_prediction,
+        "shelf_life_confidence": shelf_life_confidence,
         "quality_status": "PENDING",
         "risk_level": "PENDING",
         "batch_status": "DETECTED",
@@ -305,6 +341,20 @@ async def upload_batch(
                 f"{str(exc)}"
             )
         )
+
+    # ----------------------------------------------------
+    # Save image records
+    # ----------------------------------------------------
+    for img in image_results:
+        batch_image = BatchImage(
+            batch_id=batch_id,
+            filename=img["image_name"],
+            original_path=img.get("original_path", ""),
+            apple_count=img["apple_count"],
+            average_confidence=img["average_confidence"]
+        )
+        db.add(batch_image)
+    db.commit()
 
     # ----------------------------------------------------
     # Record status in history

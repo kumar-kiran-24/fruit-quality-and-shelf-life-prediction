@@ -19,12 +19,19 @@ class YOLOService:
         # Model path
         # ----------------------------------------------------
 
+        # Project root is two levels up from api/services
+        project_root = Path(__file__).resolve().parents[2]
         self.model_path = (
-            Path(__file__).resolve().parent.parent
-            / "models"
+            project_root
+            / "model"
             / "yolo11"
+            / "runs"
+            / "apple_detection_gpu"
+            / "weights"
             / "best.pt"
         )
+
+        print(f"YOLO model path resolved to: {self.model_path}")
 
         if not self.model_path.exists():
 

@@ -19,3 +19,5 @@ model/batch_input
 model/apple_models
 model/batch_results
 *.db
+
+*.txt

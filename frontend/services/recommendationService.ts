@@ -5,6 +5,35 @@ export interface BuyerMatch {
   distance: string
 }
 
+export interface RouteOption {
+  destination_id: string
+  destination_name: string
+  destination_type?: string
+  destination_address: string
+  distance_km?: number | null
+  duration_minutes?: number | null
+  total_score?: number | null
+  score?: number | null
+  matchScore?: string
+  is_selected?: boolean
+  recommendation_status?: string
+}
+
+export interface RoutingResponse {
+  success?: boolean
+  batch_id?: string
+  origin_address?: string
+  recommended_destination?: string | null
+  recommended_destination_id?: string | null
+  distance_km?: number | null
+  duration_minutes?: number | null
+  reason?: string | null
+  optimization_summary?: string
+  options?: RouteOption[]
+  recommendations?: RouteOption[]
+  matches?: RouteOption[]
+}
+
 export interface Recommendation {
   batchId: string
   travelExplanation: string

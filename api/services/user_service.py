@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from api.database.models import User
 from api.services.auth_service import AuthService
+from api.services.location_service import LocationService
 
 
 # ============================================================
@@ -36,7 +37,9 @@ class UserService:
         address: str | None = None,
         city: str | None = None,
         state: str | None = None,
+        country: str | None = None,
         pincode: str | None = None,
+        phone_number: str | None = None,
         latitude: float | None = None,
         longitude: float | None = None,
     ):
@@ -61,6 +64,33 @@ class UserService:
             )
 
         # ----------------------------------------------------
+        # Resolve location from PIN code if provided
+        # ----------------------------------------------------
+
+        resolved_city = city
+        resolved_state = state
+        resolved_country = country
+        resolved_latitude = latitude
+        resolved_longitude = longitude
+
+        if pincode and address:
+            try:
+                r_city, r_state, r_country, r_lat, r_lon = (
+                    LocationService.resolve_from_postal_code(
+                        address, pincode
+                    )
+                )
+                # Override with resolved values when available
+                resolved_city = r_city or resolved_city
+                resolved_state = r_state or resolved_state
+                resolved_country = r_country or resolved_country
+                resolved_latitude = r_lat if r_lat is not None else resolved_latitude
+                resolved_longitude = r_lon if r_lon is not None else resolved_longitude
+            except ValueError as exc:
+                # Do not store incorrect location
+                raise ValueError(f"Location lookup failed: {str(exc)}")
+
+        # ----------------------------------------------------
         # Create user
         # ----------------------------------------------------
 
@@ -72,11 +102,13 @@ class UserService:
                 AuthService.hash_password(password)
             ),
             address=address,
-            city=city,
-            state=state,
+            city=resolved_city,
+            state=resolved_state,
+            country=resolved_country,
             pincode=pincode,
-            latitude=latitude,
-            longitude=longitude,
+            phone_number=phone_number,
+            latitude=resolved_latitude,
+            longitude=resolved_longitude,
             role="USER",
             is_active=True
         )
@@ -171,7 +203,9 @@ class UserService:
         address: str | None = None,
         city: str | None = None,
         state: str | None = None,
+        country: str | None = None,
         pincode: str | None = None,
+        phone_number: str | None = None,
         latitude: float | None = None,
         longitude: float | None = None,
     ):
@@ -198,8 +232,14 @@ class UserService:
         if state is not None:
             user.state = state
 
+        if country is not None:
+            user.country = country
+
         if pincode is not None:
             user.pincode = pincode
+
+        if phone_number is not None:
+            user.phone_number = phone_number
 
         if latitude is not None:
             user.latitude = latitude
@@ -207,6 +247,32 @@ class UserService:
         if longitude is not None:
             user.longitude = longitude
 
+        db.commit()
+        db.refresh(user)
+
+        return user
+
+    # ========================================================
+    # CHANGE PASSWORD
+    # ========================================================
+
+    def change_password(
+        self,
+        db: Session,
+        user_id: str,
+        old_password: str,
+        new_password: str
+    ):
+
+        user = self.get_user_by_id(db, user_id)
+
+        if not user:
+            raise ValueError(f"User not found: {user_id}")
+
+        if not AuthService.verify_password(old_password, user.password_hash):
+            raise ValueError("Current password is incorrect.")
+
+        user.password_hash = AuthService.hash_password(new_password)
         db.commit()
         db.refresh(user)
 

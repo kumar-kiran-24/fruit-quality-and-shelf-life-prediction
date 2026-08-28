@@ -8,6 +8,7 @@ import Status from '../../components/common/Status'
 import Sparkline from '../../components/common/Sparkline'
 import { apiRequest } from '../../lib/apiClient'
 import { API_CONFIG } from '../../config/api.config'
+import { safeFixed } from '../../lib/utils'
 
 export default function DetectionPage() {
   const [batches, setBatches] = useState<any[]>([])
@@ -20,10 +21,10 @@ export default function DetectionPage() {
       try {
         setLoading(true)
         const data = await apiRequest(API_CONFIG.ENDPOINTS.BATCHES)
-        const list = data.batches || []
+        const list = Array.isArray(data) ? data : (data.batches || data.items || [])
         setBatches(list)
         if (list.length > 0) {
-          setSelectedBatchId(list[0].batch_id)
+          setSelectedBatchId(list[0].batch_id || list[0].id)
         }
       } catch (err: any) {
         setError(err.message || 'Failed to fetch batches.')
@@ -130,7 +131,7 @@ export default function DetectionPage() {
               </div>
               <div>
                 <small>Confidence score</small>
-                <b>{selectedBatch.freshness_confidence ? `${(selectedBatch.freshness_confidence * 100).toFixed(1)}%` : 'PENDING'}</b>
+                <b>{selectedBatch.freshness_confidence !== null && selectedBatch.freshness_confidence !== undefined ? `${safeFixed(selectedBatch.freshness_confidence * 100, 1)}%` : 'PENDING'}</b>
                 <div className="confidence">
                   <span style={{ width: selectedBatch.freshness_confidence ? `${selectedBatch.freshness_confidence * 100}%` : '0%' }} />
                 </div>

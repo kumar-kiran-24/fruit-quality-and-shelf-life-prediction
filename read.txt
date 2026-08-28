@@ -1,1 +1,2 @@
 psql -U postgres -h localhost -p 5432 -d self_life
+ uvicorn api.main:app --reload     
