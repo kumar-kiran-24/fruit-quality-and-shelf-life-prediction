@@ -7,7 +7,8 @@ from api.database.models import (
     Batch,
     Destination,
     RouteRecommendation,
-    Dispatch
+    Dispatch,
+    BatchStatusHistory
 )
 
 
@@ -202,8 +203,26 @@ class DispatchService:
         # Update batch status
         # ----------------------------------------------------
 
+        previous_status = batch.batch_status
         batch.batch_status = "DISPATCHED"
         batch.updated_at = now
+
+        # ----------------------------------------------------
+        # Record status history
+        # ----------------------------------------------------
+
+        history = BatchStatusHistory(
+            batch_id=batch.batch_id,
+            previous_status=previous_status,
+            new_status="DISPATCHED",
+            action=(
+                f"Batch dispatched to "
+                f"{destination.name}"
+            ),
+            actor=None
+        )
+
+        db.add(history)
 
         db.commit()
 
@@ -312,6 +331,10 @@ class DispatchService:
 
         if batch:
 
+            previous_batch_status = (
+                batch.batch_status
+            )
+
             if status == "DISPATCHED":
                 batch.batch_status = "DISPATCHED"
 
@@ -331,6 +354,66 @@ class DispatchService:
                 batch.batch_status = "REROUTED"
 
             batch.updated_at = now
+
+            # ------------------------------------------------
+            # Record status history
+            # ------------------------------------------------
+
+            if (
+                batch.batch_status
+                != previous_batch_status
+            ):
+
+                history = BatchStatusHistory(
+                    batch_id=dispatch.batch_id,
+                    previous_status=(
+                        previous_batch_status
+                    ),
+                    new_status=batch.batch_status,
+                    action=(
+                        f"Dispatch status updated: "
+                        f"{status}"
+                    ),
+                    actor=None
+                )
+
+                db.add(history)
+
+            # ------------------------------------------------
+            # Auto-transition DELIVERED -> COMPLETED
+            # ------------------------------------------------
+
+            if status == "DELIVERED":
+
+                if (
+                    batch.batch_status
+                    == "DELIVERED"
+                ):
+
+                    batch.batch_status = "COMPLETED"
+                    batch.updated_at = now
+
+                    completion_history = (
+                        BatchStatusHistory(
+                            batch_id=(
+                                dispatch.batch_id
+                            ),
+                            previous_status=(
+                                "DELIVERED"
+                            ),
+                            new_status=(
+                                "COMPLETED"
+                            ),
+                            action=(
+                                "Batch delivery "
+                                "confirmed and "
+                                "completed"
+                            ),
+                            actor=None
+                        )
+                    )
+
+                    db.add(completion_history)
 
         # ----------------------------------------------------
         # Delivery timestamp

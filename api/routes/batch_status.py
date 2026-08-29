@@ -111,6 +111,10 @@ def update_batch_status(
 
     try:
 
+        previous_status = (
+            batch.batch_status
+        )
+
         updated = (
             status_service.transition_status(
                 db=db,
@@ -133,7 +137,7 @@ def update_batch_status(
             "batch_id": batch_id,
 
             "previous_status":
-                batch.batch_status,
+                previous_status,
 
             "new_status":
                 updated.batch_status

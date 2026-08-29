@@ -425,13 +425,21 @@ class TransferService:
         )
 
         if batch:
+
+            batch_previous_status = (
+                batch.batch_status
+            )
+
             batch.batch_status = new_status
             batch.updated_at = now
 
             # Record status history
+            # using batch's actual previous status
             history = BatchStatusHistory(
                 batch_id=transfer.batch_id,
-                previous_status=previous_status,
+                previous_status=(
+                    batch_previous_status
+                ),
                 new_status=new_status,
                 action=(
                     f"Transfer status updated: "
@@ -443,6 +451,42 @@ class TransferService:
             )
 
             db.add(history)
+
+            # ----------------------------------------
+            # Auto-transition DELIVERED -> COMPLETED
+            # ----------------------------------------
+
+            if new_status == "DELIVERED":
+
+                if (
+                    batch.batch_status
+                    == "DELIVERED"
+                ):
+
+                    batch.batch_status = "COMPLETED"
+                    batch.updated_at = now
+
+                    completion_history = (
+                        BatchStatusHistory(
+                            batch_id=(
+                                transfer.batch_id
+                            ),
+                            previous_status=(
+                                "DELIVERED"
+                            ),
+                            new_status=(
+                                "COMPLETED"
+                            ),
+                            action=(
+                                "Batch delivery "
+                                "confirmed and "
+                                "completed"
+                            ),
+                            actor=actor
+                        )
+                    )
+
+                    db.add(completion_history)
 
         db.commit()
         db.refresh(transfer)

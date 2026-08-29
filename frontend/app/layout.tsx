@@ -7,6 +7,11 @@ export const metadata: Metadata = {
   title: 'Orchard OS — Apple Operations Intelligence',
   description: 'Track apple batches, detect quality, predict shelf life, and route every harvest to the right buyer.',
   generator: 'v0.app',
+  icons: {
+    icon: '/major-project.png',
+    shortcut: '/major-project.png',
+    apple: '/major-project.png',
+  },
 }
 
 export const viewport: Viewport = {

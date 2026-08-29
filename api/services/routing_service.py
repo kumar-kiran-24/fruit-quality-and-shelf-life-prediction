@@ -369,26 +369,78 @@ class RoutingService:
 
 
         # ----------------------------------------------------
-        # Google route calculation
+        # Route calculation
+        #
+        # Try MapsService (road distance via ORS).
+        # If unavailable, fall back to haversine.
         # ----------------------------------------------------
 
-        route_results = (
-            self.maps_service.compute_routes(
+        route_results = []
+        used_fallback = False
 
-                origin_address=
-                    batch.current_address,
+        if self.has_maps_service:
+            try:
+                route_results = (
+                    self.maps_service.compute_routes(
+                        origin_address=(
+                            batch.current_address
+                        ),
+                        destinations=(
+                            eligible_destinations
+                        )
+                    )
+                )
+            except Exception as exc:
+                logger.warning(
+                    "[Routing] MapsService failed: "
+                    f"{exc}. Using haversine fallback."
+                )
 
-                destinations=
-                    eligible_destinations
+        if not route_results:
+            # Haversine fallback
+            used_fallback = True
+            origin_coords = (
+                self._resolve_origin_coords(
+                    batch.current_address
+                )
             )
-        )
 
+            for idx, dest in enumerate(
+                eligible_destinations
+            ):
+                if (
+                    origin_coords
+                    and dest.latitude is not None
+                    and dest.longitude is not None
+                ):
+                    dist_km = self.haversine_distance(
+                        origin_coords[0],
+                        origin_coords[1],
+                        float(dest.latitude),
+                        float(dest.longitude)
+                    )
+                    road_km = dist_km * 1.3
+                    dur_min = (road_km / 60.0) * 60.0
+                else:
+                    road_km = 50.0
+                    dur_min = 120.0
+
+                route_results.append({
+                    "destination_index": idx,
+                    "distance_km": road_km,
+                    "duration_minutes": dur_min,
+                    "status": "OK",
+                    "condition": (
+                        "HAVERSINE_FALLBACK"
+                        if used_fallback
+                        else "ROUTE_FOUND"
+                    )
+                })
 
         if not route_results:
 
             raise ValueError(
-                "Google Routes API returned "
-                "no route results."
+                "No route results available."
             )
 
 

@@ -56,14 +56,11 @@ class MapsService:
                 f"{ROUTING_PROVIDER}"
             )
 
-        if not OPENROUTESERVICE_API_KEY:
-
-            raise RuntimeError(
-                "OPENROUTESERVICE_API_KEY is not configured "
-                "in the .env file."
-            )
-
         self.api_key = (
+            OPENROUTESERVICE_API_KEY
+        )
+
+        self.has_api_key = bool(
             OPENROUTESERVICE_API_KEY
         )
 
@@ -80,6 +77,19 @@ class MapsService:
 
         if not destinations:
             return []
+
+        # --------------------------------------------
+        # If no API key, signal to caller that
+        # a fallback should be used
+        # --------------------------------------------
+
+        if not self.has_api_key:
+
+            raise RuntimeError(
+                "OPENROUTESERVICE_API_KEY is not "
+                "configured. Using haversine "
+                "fallback."
+            )
 
 
         # ----------------------------------------------------

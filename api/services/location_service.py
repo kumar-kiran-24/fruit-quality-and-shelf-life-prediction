@@ -15,15 +15,33 @@ class LocationService:
         Resolve city, state, country and coordinates from address + postal code
         using Nominatim.
 
+        Supports:
+          - pincode only
+          - address + pincode
+          - address only (when pincode is None/empty)
+
         Returns city, state, country, latitude, longitude
         """
-        if not pincode:
-            return None, None, None, None, None
 
-        # Try pincode alone first, then with address for better accuracy
-        queries = [pincode.strip()]
-        if address and address.strip():
+        # Build search queries based on what we have
+        queries = []
+
+        has_pincode = pincode and pincode.strip()
+        has_address = address and address.strip()
+
+        if has_pincode and has_address:
+            # Best accuracy: try pincode alone first, then address+pincode
+            queries.append(pincode.strip())
             queries.append(f"{address.strip()}, {pincode.strip()}")
+        elif has_pincode:
+            # Pincode only
+            queries.append(pincode.strip())
+        elif has_address:
+            # Address only (e.g. "Raichur, Karnataka")
+            queries.append(address.strip())
+        else:
+            # Nothing to search with
+            return None, None, None, None, None
 
         headers = {"User-Agent": LocationService.USER_AGENT}
         last_error = None
@@ -81,25 +99,5 @@ class LocationService:
         # If we reach here, all queries failed
         if last_error:
             raise last_error
-        raise ValueError(f"Unable to resolve location for PIN code {pincode}")
-
-        result = results[0]
-        address_details = result.get("address", {}) or {}
-
-        city = (
-            address_details.get("city")
-            or address_details.get("town")
-            or address_details.get("village")
-            or address_details.get("hamlet")
-        )
-        state = address_details.get("state")
-        country = address_details.get("country")
-
-        try:
-            latitude = float(result.get("lat")) if result.get("lat") else None
-            longitude = float(result.get("lon")) if result.get("lon") else None
-        except (TypeError, ValueError):
-            latitude = None
-            longitude = None
-
-        return city, state, country, latitude, longitude
+        search_desc = pincode if has_pincode else address
+        raise ValueError(f"Unable to resolve location for: {search_desc}")

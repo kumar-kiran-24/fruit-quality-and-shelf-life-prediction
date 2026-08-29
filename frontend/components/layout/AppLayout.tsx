@@ -142,7 +142,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <div className="workspace">
-          <div className="workspace-avatar">HN</div>
+          <div className="workspace-avatar" style={{ background: '#ffffff', padding: '2px', overflow: 'hidden' }}>
+            <img src="/major-project.png" alt="Major Project Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          </div>
           <div>
             <b>Hawthorne Orchards</b>
             <small>Operations workspace</small>
@@ -220,7 +222,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <button className="mobile-menu" onClick={() => setMobileNav(true)} aria-label="Open navigation">
             <Menu size={21} />
           </button>
-          <div className="crumb">
+          <div className="crumb" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <img
+              src="/major-project.png"
+              alt="Major Project Icon"
+              style={{ height: '22px', width: 'auto', objectFit: 'contain', background: '#ffffff', padding: '2px 6px', borderRadius: '6px', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
+            />
             <span>Workspace</span>
             <span>/</span>
             {renderBreadcrumbs()}

@@ -43,6 +43,14 @@ class BatchResponse(BaseModel):
     current_address: str | None = None
 
     # --------------------------------------------------------
+    # IMAGE & DETECTION COUNTS
+    # --------------------------------------------------------
+
+    number_of_images: int | None = None
+
+    total_apples_detected: int | None = None
+
+    # --------------------------------------------------------
     # AI PREDICTIONS
     # --------------------------------------------------------
 

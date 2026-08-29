@@ -21,3 +21,5 @@ model/batch_results
 *.db
 
 *.txt
+.notebook/
+.pytest_cache
