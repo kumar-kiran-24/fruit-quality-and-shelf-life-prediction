@@ -39,26 +39,26 @@ The current prototype focuses on apple-only processing. The system is built as a
                              |
                     +--------v----------+
                     |  FastAPI Backend   |
-                    |   Uvicorn :8000   |
+                    |   Uvicorn :8000    |
                     +--------+----------+
                              |
           +------------------+------------------+
           |                  |                  |
-  +-------v------+  +-------v------+  +-------v--------+
+  +-------v------+   +------v-------+  +-------v--------+
   |  PostgreSQL   |  |  YOLOv11     |  | Groq LLM       |
-  |  Database     |  |  Detection   |  | (LangChain)     |
-  +--------------+  +--------------+  +-----------------+
+  |  Database     |  |  Detection   |  | (LangChain)    |
+  +---------------+  +--------------+  +----------------+
           |                  |                  |
-          |          +-------v------+  +-------v--------+
+          |          +-------v-------+  +--------v---------+
           |          | EfficientNet  |  | OpenRouteService|
           |          | Freshness +   |  | Nominatim       |
           |          | Shelf-Life    |  | Geocoding       |
-          |          +--------------+  +-----------------+
+          |          +---------------+  +------------------+
           |
-  +-------v------+
+  +-------v-------+
   | Image Storage |
   | (uploads/)    |
-  +--------------+
+  +---------------+
 ```
 
 **Frontend** communicates with the **Backend** over HTTP REST endpoints at `/api/v1/*`. The backend orchestrates all AI/ML inference, database operations, and external API calls. Uploaded images are stored on disk and served as static files. The system uses PostgreSQL for persistent data storage and connects to external services for geocoding (Nominatim), road distance calculation (OpenRouteService), and LLM inference (Groq).
